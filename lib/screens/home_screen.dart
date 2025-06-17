@@ -13,7 +13,7 @@ class HomePage extends StatefulWidget {
   _HomePageState createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   bool isSearching = false;
   List<Map<String, String>> bookmarkedQuotes = [];
   List<dynamic> quotes = [];
@@ -23,14 +23,67 @@ class _HomePageState extends State<HomePage> {
   int skip = 0;
   final FlutterTts flutterTts = FlutterTts();
   final TextEditingController searchController = TextEditingController();
+  
+  // Animation controllers
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  // Gradient colors for quotes
+  final List<List<Color>> gradients = [
+    [const Color(0xFF667eea), const Color(0xFF764ba2)],
+    [const Color(0xFF11998e), const Color(0xFF38ef7d)],
+    [const Color(0xFFee0979), const Color(0xFFff6a00)],
+    [const Color(0xFF4facfe), const Color(0xFF00f2fe)],
+    [const Color(0xFFff9a9e), const Color(0xFFfecfef)],
+    [const Color(0xFFa8edea), const Color(0xFFfed6e3)],
+  ];
 
   @override
   void initState() {
     super.initState();
     _loadBookmarks();
     _fetchQuotes();
+    
+    // Initialize animations
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeInOut,
+    ));
+    
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
+    ));
+    
+    _fadeController.forward();
+    _slideController.forward();
   }
 
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _slideController.dispose();
+    super.dispose();
+  }
+
+  // Your existing methods remain the same
   Future<void> _loadBookmarks() async {
     final prefs = await SharedPreferences.getInstance();
     final bookmarks = prefs.getString('bookmarkedQuotes');
@@ -57,7 +110,6 @@ class _HomePageState extends State<HomePage> {
     await prefs.setString('bookmarkedQuotes', json.encode(bookmarkedQuotes));
     print("Bookmarks saved: ${json.encode(bookmarkedQuotes)}");
   }
-
 
   Future<void> _fetchQuotes() async {
     final url = Uri.parse('https://dummyjson.com/quotes?skip=$skip&limit=30');
@@ -104,7 +156,7 @@ class _HomePageState extends State<HomePage> {
             quote['author'].toLowerCase().contains(query.toLowerCase()))
             .toList();
       }
-      currentIndex = 0; // Reset to the first result after filtering
+      currentIndex = 0;
     });
   }
 
@@ -112,20 +164,26 @@ class _HomePageState extends State<HomePage> {
     final alreadyBookmarked = bookmarkedQuotes.any((item) => item['quote'] == quote);
     if (alreadyBookmarked) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("This quote is already bookmarked!"),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: const Text("This quote is already bookmarked!"),
+          backgroundColor: Colors.orange.withOpacity(0.8),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 2),
         ),
       );
     } else {
       setState(() {
         bookmarkedQuotes.add({"quote": quote, "author": author});
       });
-      _saveBookmarks(); // Save bookmarks to local storage
+      _saveBookmarks();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Quote has been bookmarked!"),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: const Text("Quote has been bookmarked!"),
+          backgroundColor: Colors.green.withOpacity(0.8),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -135,11 +193,14 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       bookmarkedQuotes.removeWhere((item) => item['quote'] == quote);
     });
-    _saveBookmarks(); // Update the saved bookmarks
+    _saveBookmarks();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Quote has been removed from bookmarks!"),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: const Text("Quote has been removed from bookmarks!"),
+        backgroundColor: Colors.red.withOpacity(0.8),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -155,44 +216,72 @@ class _HomePageState extends State<HomePage> {
   void _showShareOptions() {
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
         return Container(
-          color: Colors.black,
+          decoration: const BoxDecoration(
+            color: Colors.black,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Handle bar
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 15),
+                decoration: BoxDecoration(
+                  color: Colors.grey[600],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
               const Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Text(
                   "Share quote as",
                   style: TextStyle(
-                    color: Colors.orange,
-                    fontSize: 18,
+                    color: Colors.white,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  Column(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.text_fields, color: Colors.white),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _shareQuoteAsText();
-                        },
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _shareQuoteAsText();
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF667eea), Color(0xFF764ba2)],
                       ),
-                      const Text(
-                        "Text",
-                        style: TextStyle(color: Colors.white70),
-                      ),
-                    ],
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.text_fields, color: Colors.white),
+                        SizedBox(width: 10),
+                        Text(
+                          "Share as Text",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
             ],
           ),
         );
@@ -206,195 +295,453 @@ class _HomePageState extends State<HomePage> {
     Share.share(shareText);
   }
 
+  void _nextQuote() {
+    if (currentIndex < filteredQuotes.length - 1) {
+      setState(() {
+        currentIndex++;
+      });
+      _fadeController.reset();
+      _slideController.reset();
+      _fadeController.forward();
+      _slideController.forward();
+    }
+  }
+
+  void _previousQuote() {
+    if (currentIndex > 0) {
+      setState(() {
+        currentIndex--;
+      });
+      _fadeController.reset();
+      _slideController.reset();
+      _fadeController.forward();
+      _slideController.forward();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
         title: isSearching
-            ? TextField(
-          controller: searchController,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: "Search quotes...",
-            hintStyle: TextStyle(color: Colors.white54),
-            border: InputBorder.none,
-          ),
-          onChanged: (value) => _filterQuotes(value),
-        )
-            : const Text("Home"),
-        backgroundColor: Colors.orange,
+            ? Container(
+                padding: const EdgeInsets.symmetric(horizontal: 15),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: TextField(
+                  controller: searchController,
+                  autofocus: true,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    hintText: "Search quotes...",
+                    hintStyle: TextStyle(color: Colors.white54),
+                    border: InputBorder.none,
+                    prefixIcon: Icon(Icons.search, color: Colors.white54),
+                  ),
+                  onChanged: (value) => _filterQuotes(value),
+                ),
+              )
+            : const Text(
+                "Daily Quotes",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                ),
+              ),
         leading: Builder(
-          builder: (context) => IconButton(
-            icon: Icon(isSearching ? Icons.close : Icons.menu),
-            onPressed: () {
-              if (isSearching) {
-                setState(() {
-                  isSearching = false;
-                  searchController.clear();
-                  filteredQuotes = quotes;
-                });
-              } else {
-                Scaffold.of(context).openDrawer();
-              }
-            },
+          builder: (context) => Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              icon: Icon(isSearching ? Icons.close : Icons.menu),
+              onPressed: () {
+                if (isSearching) {
+                  setState(() {
+                    isSearching = false;
+                    searchController.clear();
+                    filteredQuotes = quotes;
+                  });
+                } else {
+                  Scaffold.of(context).openDrawer();
+                }
+              },
+            ),
           ),
         ),
         actions: [
-          IconButton(
-            icon: Icon(isSearching ? Icons.close : Icons.search),
-            tooltip: "Search",
-            onPressed: () {
-              setState(() {
-                isSearching = !isSearching;
-                if (!isSearching) {
-                  searchController.clear();
-                  filteredQuotes = quotes;
-                }
-              });
-            },
+          Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              icon: Icon(isSearching ? Icons.close : Icons.search),
+              tooltip: "Search",
+              onPressed: () {
+                setState(() {
+                  isSearching = !isSearching;
+                  if (!isSearching) {
+                    searchController.clear();
+                    filteredQuotes = quotes;
+                  }
+                });
+              },
+            ),
           ),
         ],
       ),
-      drawer: Drawer(
-        backgroundColor: Colors.black,
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.orange,
-              ),
-              child: Text(
-                'Menu',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 24,
+      drawer: _buildModernDrawer(),
+      body: filteredQuotes.isEmpty
+          ? Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF0D0D0D), Color(0xFF1A1A1A)],
                 ),
               ),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                ),
+              ),
+            )
+          : _buildQuoteBody(),
+    );
+  }
+
+  Widget _buildModernDrawer() {
+    return Drawer(
+      backgroundColor: const Color(0xFF0D0D0D),
+      child: Column(
+        children: [
+          Container(
+            height: 200,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.home, color: Colors.orange),
-              title: const Text('Home', style: TextStyle(color: Colors.orange)),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.bookmark, color: Colors.orange),
-              title: const Text('Bookmark', style: TextStyle(color: Colors.orange)),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => BookmarkScreen(
-                      bookmarkedQuotes: bookmarkedQuotes,
-                      removeBookmark: _removeBookmark,
+            child: const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.format_quote,
+                    size: 50,
+                    color: Colors.white,
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    'Daily Quotes',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.person, color: Colors.orange),
-              title: const Text('Authors', style: TextStyle(color: Colors.orange)),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AuthorScreen(
-                      authors: authors,
-                      quotes: quotes,
+                  Text(
+                    'Inspire your day',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
                     ),
                   ),
-                );
-              },
+                ],
+              ),
             ),
-          ],
+          ),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _buildDrawerItem(
+                  icon: Icons.home,
+                  title: 'Home',
+                  onTap: () => Navigator.pop(context),
+                ),
+                _buildDrawerItem(
+                  icon: Icons.bookmark,
+                  title: 'Bookmarks',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BookmarkScreen(
+                          bookmarkedQuotes: bookmarkedQuotes,
+                          removeBookmark: _removeBookmark,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                _buildDrawerItem(
+                  icon: Icons.person,
+                  title: 'Authors',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AuthorScreen(
+                          authors: authors,
+                          quotes: quotes,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        onTap: onTap,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
         ),
       ),
-      body: filteredQuotes.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : Center(
+    );
+  }
+
+  Widget _buildQuoteBody() {
+    final currentGradient = gradients[currentIndex % gradients.length];
+    
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: currentGradient,
+        ),
+      ),
+      child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(20.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                '"${filteredQuotes[currentIndex]['quote']}"',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontStyle: FontStyle.italic,
-                  color: Colors.white,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              Text(
-                '- ${filteredQuotes[currentIndex]['author']}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange,
-                ),
-              ),
-              const SizedBox(height: 40),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton(
-                    onPressed: currentIndex > 0
-                        ? () {
-                      setState(() {
-                        currentIndex--;
-                      });
-                    }
-                        : null,
-                    child: const Text("Previous"),
-                  ),
-                  ElevatedButton(
-                    onPressed: currentIndex < filteredQuotes.length - 1
-                        ? () {
-                      setState(() {
-                        currentIndex++;
-                      });
-                    }
-                        : null,
-                    child: const Text("Next"),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.play_circle_fill, color: Colors.orange),
-                    onPressed: _speakQuote,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.share, color: Colors.orange),
-                    onPressed: _showShareOptions,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.bookmark, color: Colors.orange),
-                    onPressed: () {
-                      _bookmarkQuote(filteredQuotes[currentIndex]['quote'],
-                          filteredQuotes[currentIndex]['author']);
+              Expanded(
+                child: Center(
+                  child: AnimatedBuilder(
+                    animation: _fadeAnimation,
+                    builder: (context, child) {
+                      return SlideTransition(
+                        position: _slideAnimation,
+                        child: FadeTransition(
+                          opacity: _fadeAnimation,
+                          child: Container(
+                            padding: const EdgeInsets.all(30),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(25),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 60,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  child: const Icon(
+                                    Icons.format_quote,
+                                    color: Colors.white,
+                                    size: 30,
+                                  ),
+                                ),
+                                const SizedBox(height: 30),
+                                Text(
+                                  '"${filteredQuotes[currentIndex]['quote']}"',
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                    height: 1.4,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 25),
+                                Text(
+                                  '— ${filteredQuotes[currentIndex]['author']}',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
                     },
                   ),
-                ],
+                ),
+              ),
+              
+              // Navigation buttons
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildNavButton(
+                      icon: Icons.arrow_back_ios,
+                      onPressed: currentIndex > 0 ? _previousQuote : null,
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${currentIndex + 1} / ${filteredQuotes.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    _buildNavButton(
+                      icon: Icons.arrow_forward_ios,
+                      onPressed: currentIndex < filteredQuotes.length - 1 ? _nextQuote : null,
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Action buttons
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildActionButton(
+                      icon: Icons.volume_up,
+                      onPressed: _speakQuote,
+                    ),
+                    _buildActionButton(
+                      icon: Icons.share,
+                      onPressed: _showShareOptions,
+                    ),
+                    _buildActionButton(
+                      icon: Icons.bookmark_add,
+                      onPressed: () {
+                        _bookmarkQuote(
+                          filteredQuotes[currentIndex]['quote'],
+                          filteredQuotes[currentIndex]['author'],
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
       ),
-      backgroundColor: Colors.black,
+    );
+  }
+
+  Widget _buildNavButton({
+    required IconData icon,
+    required VoidCallback? onPressed,
+  }) {
+    return Container(
+      width: 50,
+      height: 50,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(onPressed != null ? 0.2 : 0.1),
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: IconButton(
+        icon: Icon(
+          icon,
+          color: Colors.white.withOpacity(onPressed != null ? 1.0 : 0.5),
+        ),
+        onPressed: onPressed,
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: IconButton(
+        icon: Icon(
+          icon,
+          color: Colors.white,
+          size: 24,
+        ),
+        onPressed: onPressed,
+      ),
     );
   }
 }
 
+// Keep your existing BookmarkScreen class exactly as it is
 class BookmarkScreen extends StatefulWidget {
   final List<Map<String, String>> bookmarkedQuotes;
   final Function(String) removeBookmark;
@@ -425,55 +772,109 @@ class _BookmarkScreenState extends State<BookmarkScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Bookmark"),
+        title: const Text("Bookmarks"),
         backgroundColor: Colors.orange,
+        elevation: 0,
       ),
-      body: localBookmarks.isEmpty
-          ? const Center(
-        child: Text(
-          "No bookmarks yet!",
-          style: TextStyle(color: Colors.white70, fontSize: 16),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF0D0D0D), Color(0xFF1A1A1A)],
+          ),
         ),
-      )
-          : ListView.builder(
-        itemCount: localBookmarks.length,
-        itemBuilder: (context, index) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey[900],
-                borderRadius: BorderRadius.circular(10),
+        child: localBookmarks.isEmpty
+            ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.bookmark_border,
+                      size: 80,
+                      color: Colors.white24,
+                    ),
+                    SizedBox(height: 20),
+                    Text(
+                      "No bookmarks yet!",
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      "Start bookmarking your favorite quotes",
+                      style: TextStyle(
+                        color: Colors.white38,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: localBookmarks.length,
+                itemBuilder: (context, index) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.grey[900]!,
+                          Colors.grey[850]!,
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.1),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '"${localBookmarks[index]['quote']}"',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              tooltip: "Remove Bookmark",
+                              onPressed: () {
+                                _removeAndUpdate(localBookmarks[index]['quote']!);
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          '— ${localBookmarks[index]['author']!}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.orange,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
-              child: ListTile(
-                title: Text(
-                  '"${localBookmarks[index]['quote']}"',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.white,
-                  ),
-                ),
-                subtitle: Text(
-                  localBookmarks[index]['author']!,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white70,
-                  ),
-                ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  tooltip: "Remove Bookmark",
-                  onPressed: () {
-                    _removeAndUpdate(localBookmarks[index]['quote']!);
-                  },
-                ),
-              ),
-            ),
-          );
-        },
       ),
-      backgroundColor: Colors.black,
     );
   }
 }
