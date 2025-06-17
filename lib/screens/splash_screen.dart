@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'random_ad_screen.dart'; // Import the ad screen
+import 'home_screen.dart'; // Import your home screen
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -48,9 +50,29 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     _fadeController.forward();
     _scaleController.forward();
 
-    // Navigate to HomeScreen after 3 seconds
+    // Navigate to Ad Screen after 3 seconds (instead of directly to home)
     Timer(const Duration(seconds: 3), () {
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => RandomAdScreen(
+            onSkip: () {
+              // When user skips ad, go to home screen
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => HomePage()),
+              );
+            },
+            onAdComplete: () {
+              // When ad completes naturally, go to home screen
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => HomePage()),
+              );
+            },
+          ),
+        ),
+      );
     });
   }
 
